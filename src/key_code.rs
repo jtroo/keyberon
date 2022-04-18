@@ -3,7 +3,7 @@
 #[allow(missing_docs)]
 /// Define a key code according to the HID specification.  Their names
 /// correspond to the american QWERTY layout.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum KeyCode {
     /// The "no" key, a placeholder to express nothing.
