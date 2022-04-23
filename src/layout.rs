@@ -46,7 +46,7 @@
 /// ```
 pub use keyberon_macros::*;
 
-use crate::action::{Action, HoldTapConfig};
+use crate::action::{Action, HoldTapConfig, SequenceEvent};
 use crate::key_code::KeyCode;
 use arraydeque::ArrayDeque;
 use heapless::Vec;
@@ -77,6 +77,7 @@ where
     waiting: Option<WaitingState<T>>,
     stacked: Stack,
     tap_hold_tracker: TapHoldTracker,
+    active_sequences: ArrayDeque<[SequenceState; 4], arraydeque::behavior::Wrapping>,
 }
 
 /// An event on the key matrix.
@@ -172,6 +173,7 @@ enum State<T: 'static> {
     NormalKey { keycode: KeyCode, coord: (u8, u8) },
     LayerModifier { value: usize, coord: (u8, u8) },
     Custom { value: &'static T, coord: (u8, u8) },
+    FakeKey { keycode: KeyCode }, // Fake key event for sequences
 }
 impl<T> Copy for State<T> {}
 impl<T> Clone for State<T> {
@@ -183,6 +185,7 @@ impl<T: 'static> State<T> {
     fn keycode(&self) -> Option<KeyCode> {
         match self {
             NormalKey { keycode, .. } => Some(*keycode),
+            FakeKey { keycode } => Some(*keycode),
             _ => None,
         }
     }
@@ -196,6 +199,12 @@ impl<T: 'static> State<T> {
                 custom.update(CustomEvent::Release(value));
                 None
             }
+            _ => Some(*self),
+        }
+    }
+    fn seq_release(&self, kc: KeyCode) -> Option<Self> {
+        match *self {
+            FakeKey { keycode, .. } if keycode == kc => None,
             _ => Some(*self),
         }
     }
@@ -263,6 +272,14 @@ impl<T> WaitingState<T> {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+struct SequenceState {
+    cur_event: Option<SequenceEvent>,
+    delay: u32,              // Keeps track of SequenceEvent::Delay time remaining
+    tapped: Option<KeyCode>, // Keycode of a key that should be released at the next tick
+    remaining_events: &'static [SequenceEvent],
+}
+
 #[derive(Debug)]
 struct Stacked {
     event: Event,
@@ -301,6 +318,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
             waiting: None,
             stacked: ArrayDeque::new(),
             tap_hold_tracker: Default::default(),
+            active_sequences: ArrayDeque::new(),
         }
     }
     /// Iterates on the key codes of the current state.
@@ -340,6 +358,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
         self.states = self.states.iter().filter_map(State::tick).collect();
         self.stacked.iter_mut().for_each(Stacked::tick);
         self.tap_hold_tracker.tick();
+        self.process_sequences();
         match &mut self.waiting {
             Some(w) => match w.tick(&self.stacked) {
                 WaitingAction::Hold => self.waiting_into_hold(),
@@ -350,6 +369,84 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                 Some(s) => self.unstack(s),
                 None => CustomEvent::NoEvent,
             },
+        }
+    }
+    /// Takes care of draining and populating the `active_sequences` ArrayDeque,
+    /// giving us sequences (aka macros) of nearly limitless length!
+    fn process_sequences(&mut self) {
+        // Iterate over all active sequence events
+        for _ in 0..self.active_sequences.len() {
+            if let Some(mut seq) = self.active_sequences.pop_front() {
+                // If we've encountered a SequenceEvent::Delay we must count
+                // that down completely before doing anything else...
+                if seq.delay > 0 {
+                    seq.delay = seq.delay.saturating_sub(1);
+                } else if let Some(keycode) = seq.tapped {
+                    // Clear out the Press() matching this Tap()'s keycode
+                    self.states = self
+                        .states
+                        .iter()
+                        .filter_map(|s| s.seq_release(keycode))
+                        .collect();
+                    seq.tapped = None;
+                } else {
+                    // Pull the next SequenceEvent
+                    match seq.remaining_events {
+                        [e, tail @ ..] => {
+                            seq.cur_event = Some(*e);
+                            seq.remaining_events = tail;
+                        }
+                        [] => (),
+                    }
+                    // Process it (SequenceEvent)
+                    match seq.cur_event {
+                        Some(SequenceEvent::Complete) => {
+                            for fake_key in self.states.clone().iter() {
+                                match *fake_key {
+                                    FakeKey { keycode } => {
+                                        self.states = self
+                                            .states
+                                            .iter()
+                                            .filter_map(|s| s.seq_release(keycode))
+                                            .collect();
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            seq.remaining_events = &[];
+                        }
+                        Some(SequenceEvent::Press(keycode)) => {
+                            // Start tracking this fake key Press() event
+                            let _ = self.states.push(FakeKey { keycode });
+                        }
+                        Some(SequenceEvent::Tap(keycode)) => {
+                            // Same as Press() except we track it for one tick via seq.tapped:
+                            let _ = self.states.push(FakeKey { keycode });
+                            seq.tapped = Some(keycode);
+                        }
+                        Some(SequenceEvent::Release(keycode)) => {
+                            // Clear out the Press() matching this Release's keycode
+                            self.states = self
+                                .states
+                                .iter()
+                                .filter_map(|s| s.seq_release(keycode))
+                                .collect()
+                        }
+                        Some(SequenceEvent::Delay { duration }) => {
+                            // Setup a delay that will be decremented once per tick until 0
+                            if duration > 0 {
+                                // -1 to start since this tick counts
+                                seq.delay = duration - 1;
+                            }
+                        }
+                        _ => {} // We'll never get here
+                    }
+                }
+                if seq.remaining_events.len() > 0 {
+                    // Put it back
+                    self.active_sequences.push_back(seq);
+                }
+            }
         }
     }
     fn unstack(&mut self, stacked: Stacked) -> CustomEvent<T> {
@@ -451,6 +548,30 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                     custom.update(self.do_action(action, coord, delay));
                 }
                 return custom;
+            }
+            Sequence { events } => {
+                self.active_sequences.push_back(SequenceState {
+                    cur_event: None,
+                    delay: 0,
+                    tapped: None,
+                    remaining_events: events,
+                });
+            }
+            CancelSequences => {
+                // Clear any and all running sequences then clean up any leftover FakeKey events
+                self.active_sequences.clear();
+                for fake_key in self.states.clone().iter() {
+                    match *fake_key {
+                        FakeKey { keycode } => {
+                            self.states = self
+                                .states
+                                .iter()
+                                .filter_map(|s| s.seq_release(keycode))
+                                .collect();
+                        }
+                        _ => {}
+                    }
+                }
             }
             &Layer(value) => {
                 self.tap_hold_tracker.coord = coord;
