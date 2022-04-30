@@ -1,5 +1,12 @@
 # Keyberon [![Build status](https://travis-ci.org/TeXitoi/keyberon.svg?branch=master)](https://travis-ci.org/TeXitoi/keyberon) [![](https://img.shields.io/crates/v/keyberon.svg)](https://crates.io/crates/keyberon) [![](https://docs.rs/keyberon/badge.svg)](https://docs.rs/keyberon)
 
+## Note
+
+This is a fork intended for use by the [kanata keyboard remapper software](https://github.com/jtroo/keyberon).
+Please make contributions to the original project.
+
+## Brief
+
 A rust crate to create a pure rust keyboard firmware.
 
 It is exposed as a library giving you the different building blocks to
@@ -77,7 +84,7 @@ The supported features are:
  - hold tap: different action depending if the key is held or
    tapped. For example, you can have a key acting as layer change when
    held, and space when tapped.
-   
+
 
 ## FAQ
 

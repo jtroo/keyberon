@@ -44,7 +44,7 @@
 ///     // ...
 /// };
 /// ```
-pub use keyberon_macros::*;
+pub use kanata_keyberon_macros::*;
 
 use crate::action::{Action, HoldTapConfig, SequenceEvent};
 use crate::key_code::KeyCode;
