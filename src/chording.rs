@@ -12,48 +12,6 @@
 //! You must use a virtual row/area of your layout to
 //! define the result of the chord if the desired result is
 //! not already on the layer that you want to use the chord on.
-
-/// ## Usage
-/// ```
-/// use keyberon::chording::{Chording, ChordDef};
-/// use keyberon::layout::{Layout, Event::*, Event};
-/// use keyberon::debounce::Debouncer;
-/// use keyberon::matrix::Matrix;
-///
-/// // The chord is defined by two or more locations in the layout
-/// // that correspond to a single location in the layout
-/// const CHORDS: [ChordDef; 2] = [
-///     ((0, 2), &[(0, 0), (0, 1)]),
-///     ((0, 0), &[(0, 1), (0, 2)]),
-/// ];
-/// // A count of 30 (ms) is a good default
-/// const DEBOUNCE_COUNT: u16 = 30;
-///
-/// pub static LAYERS: keyberon::layout::Layers<3, 1, 1> = keyberon::layout::layout! {
-///     { [ A B C ] }
-/// };
-///
-/// let mut layout = Layout::new(&LAYERS);
-/// // Debouncer period determines chording timeout
-/// let mut debouncer: Debouncer<[[bool; 3]; 1]> =
-///     Debouncer::new([[false; 3]; 1], [[false; 3]; 1], DEBOUNCE_COUNT);
-/// let mut chording = Chording::new(&CHORDS);
-///
-/// // the rest of this example should be called inside a callback
-/// // The PressedKeys are normally determined by calling the matrix
-/// // and the for loop is just to get past the debouncer
-/// for _ in 0..DEBOUNCE_COUNT {
-///     assert_eq!(0, debouncer.events([[true, true, false]]).count());
-/// }
-/// let mut events = chording
-///     .tick(debouncer.events([[true, true, false]]).collect())
-///     .into_iter();
-/// let event = events.next();
-/// assert_eq!(Some(Event::Press(0, 2)), event);
-/// layout.event(event.unwrap());
-/// let event = events.next();
-/// assert_eq!(None, event);
-/// ```
 use crate::layout::Event;
 use heapless::Vec;
 

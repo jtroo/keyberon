@@ -74,8 +74,8 @@ impl<T: PartialEq> Debouncer<T> {
     /// # Example
     ///
     /// ```
-    /// use keyberon::debounce::Debouncer;
-    /// use keyberon::layout::Event;
+    /// use kanata_keyberon::debounce::Debouncer;
+    /// use kanata_keyberon::layout::Event;
     /// let mut debouncer = Debouncer::new(
     ///     [[false, false], [false, false]],
     ///     [[false, false], [false, false]],
