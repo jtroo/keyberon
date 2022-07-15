@@ -197,6 +197,21 @@ pub enum OneShotEndConfig {
 /// Defines the maximum number of one shot keys that can be combined.
 pub const ONE_SHOT_MAX_ACTIVE: usize = 8;
 
+/// Define tap dance behaviour.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct TapDance<T = core::convert::Infallible>
+where
+    T: 'static,
+{
+    /// List of actions that activate based on number of taps. Only one of the actions will
+    /// activate. Tapping the tap-dance key once will activate the action in index 0, three
+    /// times will activate the action in index 2.
+    pub actions: &'static [&'static Action<T>],
+    /// Timeout after which a tap will expire and become an action. A new tap for the same
+    /// tap-dance key will reset this timeout.
+    pub timeout: u16,
+}
+
 /// The different actions that can be done.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -243,6 +258,13 @@ where
     /// key will hold space until either another key is pressed or the timeout occurs, which will
     /// probably send many undesired space characters to your active application.
     OneShot(&'static OneShot<T>),
+    /// Tap-dance key. When tapping the key N times in quck succession, activates the N'th action
+    /// in `actions`. The action will activate in the following conditions:
+    ///
+    /// - a different key is pressed
+    /// - `timeout` ticks elapse since the last tap of the same tap-dance key
+    /// - the number of taps is equal to the length of `actions`.
+    TapDance(&'static TapDance<T>),
 }
 impl<T> Action<T> {
     /// Gets the layer number if the action is the `Layer` action.
