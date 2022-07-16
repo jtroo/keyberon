@@ -238,10 +238,11 @@ impl<T> WaitingState<T> {
             WaitingConfig::HoldTap(htc) => (self.handle_hold_tap(htc, stacked), None),
             WaitingConfig::OneShot => (self.handle_one_shot(stacked), None),
             WaitingConfig::TapDance(ref tds) => {
-                let (ret, num_taps) = self.handle_tap_dance(tds.num_taps, stacked);
+                let (ret, num_taps) =
+                    self.handle_tap_dance(tds.num_taps, tds.actions.len(), stacked);
                 // Due to ownership issues, handle_tap_dance can't contain all of the necessary
                 // logic.
-                if ret.is_some() || usize::from(num_taps) >= tds.actions.len() {
+                if ret.is_some() {
                     let idx = core::cmp::min(num_taps.into(), tds.actions.len()).saturating_sub(1);
                     self.tap = tds.actions[idx];
                 }
@@ -329,7 +330,12 @@ impl<T> WaitingState<T> {
         Some(WaitingAction::Tap)
     }
 
-    fn handle_tap_dance(&self, num_taps: u16, stacked: &mut Stack) -> (Option<WaitingAction>, u16) {
+    fn handle_tap_dance(
+        &self,
+        num_taps: u16,
+        max_taps: usize,
+        stacked: &mut Stack,
+    ) -> (Option<WaitingAction>, u16) {
         // Evict events with the same coordinates except for the final release. E.g. if 3 taps have
         // occurred, this will remove all `Press` events and 2 `Release` events. This is done so
         // that the state machine processes the entire tap dance sequence as a single press and
@@ -349,7 +355,7 @@ impl<T> WaitingState<T> {
                 do_retain
             });
         };
-        if self.timeout == 0 {
+        if self.timeout == 0 || usize::from(num_taps) >= max_taps {
             evict_same_coord_events(num_taps, stacked);
             return (Some(WaitingAction::Tap), num_taps);
         }
@@ -1699,10 +1705,8 @@ mod test {
         assert_eq!(CustomEvent::NoEvent, layout.tick());
         assert_keys(&[], layout.keycodes());
         layout.event(Release(0, 0));
-        for _ in 0..100 {
-            assert_eq!(CustomEvent::NoEvent, layout.tick());
-            assert_keys(&[], layout.keycodes());
-        }
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[], layout.keycodes());
         assert_eq!(CustomEvent::NoEvent, layout.tick());
         assert_keys(&[Space], layout.keycodes());
         assert_eq!(CustomEvent::NoEvent, layout.tick());
@@ -1726,12 +1730,14 @@ mod test {
             assert_keys(&[], layout.keycodes());
         }
         layout.event(Press(0, 0));
-        for _ in 0..200 {
+        for _ in 0..101 {
             assert_eq!(CustomEvent::NoEvent, layout.tick());
             assert_keys(&[], layout.keycodes());
         }
-        assert_eq!(CustomEvent::NoEvent, layout.tick());
-        assert_keys(&[LAlt], layout.keycodes());
+        for _ in 0..200 {
+            assert_eq!(CustomEvent::NoEvent, layout.tick());
+            assert_keys(&[LAlt], layout.keycodes());
+        }
         layout.event(Release(0, 0));
         assert_eq!(CustomEvent::NoEvent, layout.tick());
         assert_keys(&[], layout.keycodes());
