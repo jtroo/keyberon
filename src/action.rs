@@ -223,6 +223,38 @@ where
     },
     /// Cancels any running sequences
     CancelSequences,
+    /// One-shot key. Activates `action` until a single other key is pressed following the
+    /// one shot activation or `timeout` ticks elapse. For example, a one-shot key can be
+    /// used to activate shift for exactly one keypress or switch to another layer for
+    /// exactly one keypress.
+    ///
+    /// Holding a one-shot key will be treated as a normal held keypress.
+    ///
+    /// If you use one-shot outside of its intended use cases (modifier key action or layer
+    /// action) then you will likely have undesired behaviour. E.g. one-shot with the space
+    /// key will hold space until either another key is pressed or the timeout occurs, which will
+    /// probably send many undesired space characters to your active application.
+    OneShot {
+        /// Action to activate until timeout expires or exactly one keypress is activated.
+        action: &'static Action<T>,
+        /// Timeout after which one-shot will expire.
+        timeout: u16,
+    },
+    /// Tap-dance key. When tapping the key N times in quck succession, activates the N'th action
+    /// in `actions`. The action will activate in the following conditions:
+    ///
+    /// - a different key is pressed
+    /// - `timeout` ticks elapse since the last tap of the same tap-dance key
+    /// - the number of taps is equal to the length of `actions`.
+    TapDance {
+        /// List of actions that activate based on number of taps. Only one of the actions will
+        /// activate. Tapping the tap-dance key once will activate the action in index 0, three
+        /// times will activate the action in index 2.
+        actions: &'static [&'static Action<T>],
+        /// Timeout after which a tap will expire and become an action. A new tap for the same
+        /// tap-dance key will reset this timeout.
+        timeout: u16,
+    },
     /// Custom action.
     ///
     /// Define a user defined action. This enum can be anything you
