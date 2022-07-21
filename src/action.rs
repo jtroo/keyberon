@@ -285,11 +285,34 @@ impl<T> Debug for Action<T> {
             Self::MultipleActions(arg0) => f.debug_tuple("MultipleActions").field(arg0).finish(),
             Self::Layer(arg0) => f.debug_tuple("Layer").field(arg0).finish(),
             Self::DefaultLayer(arg0) => f.debug_tuple("DefaultLayer").field(arg0).finish(),
-            Self::HoldTap { timeout, hold, tap, config, tap_hold_interval } => f.debug_struct("HoldTap").field("timeout", timeout).field("hold", hold).field("tap", tap).field("config", config).field("tap_hold_interval", tap_hold_interval).finish(),
-            Self::Sequence { events } => f.debug_struct("Sequence").field("events", events).finish(),
+            Self::HoldTap {
+                timeout,
+                hold,
+                tap,
+                config,
+                tap_hold_interval,
+            } => f
+                .debug_struct("HoldTap")
+                .field("timeout", timeout)
+                .field("hold", hold)
+                .field("tap", tap)
+                .field("config", config)
+                .field("tap_hold_interval", tap_hold_interval)
+                .finish(),
+            Self::Sequence { events } => {
+                f.debug_struct("Sequence").field("events", events).finish()
+            }
             Self::CancelSequences => write!(f, "CancelSequences"),
-            Self::OneShot { action, timeout } => f.debug_struct("OneShot").field("action", action).field("timeout", timeout).finish(),
-            Self::TapDance { actions, timeout } => f.debug_struct("TapDance").field("actions", actions).field("timeout", timeout).finish(),
+            Self::OneShot { action, timeout } => f
+                .debug_struct("OneShot")
+                .field("action", action)
+                .field("timeout", timeout)
+                .finish(),
+            Self::TapDance { actions, timeout } => f
+                .debug_struct("TapDance")
+                .field("actions", actions)
+                .field("timeout", timeout)
+                .finish(),
             Self::Custom(_) => f.debug_tuple("Custom").finish(),
             Self::ReleaseState(arg0) => f.debug_tuple("ReleaseState").field(arg0).finish(),
         }

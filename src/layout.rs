@@ -1744,20 +1744,11 @@ mod test {
     fn release_state() {
         static LAYERS: Layers<2, 1, 2> = [
             [[
-                MultipleActions(&[
-                    KeyCode(LCtrl),
-                    Layer(1),
-                ]),
-                MultipleActions(&[
-                    KeyCode(LAlt),
-                    Layer(1),
-                ]),
+                MultipleActions(&[KeyCode(LCtrl), Layer(1)]),
+                MultipleActions(&[KeyCode(LAlt), Layer(1)]),
             ]],
             [[
-                MultipleActions(&[
-                    ReleaseState(ReleasableState::KeyCode(LAlt)),
-                    KeyCode(Space),
-                ]),
+                MultipleActions(&[ReleaseState(ReleasableState::KeyCode(LAlt)), KeyCode(Space)]),
                 ReleaseState(ReleasableState::Layer(1)),
             ]],
         ];
