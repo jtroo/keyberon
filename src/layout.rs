@@ -23,7 +23,7 @@
 ///
 pub use kanata_keyberon_macros::*;
 
-use crate::action::{Action, HoldTapConfig, SequenceEvent};
+use crate::action::{Action, HoldTapConfig, ReleasableState, SequenceEvent};
 use crate::key_code::KeyCode;
 use arraydeque::ArrayDeque;
 use heapless::Vec;
@@ -178,6 +178,25 @@ impl<T: 'static> State<T> {
             Custom { value, coord } if coord == c => {
                 custom.update(CustomEvent::Release(value));
                 None
+            }
+            _ => Some(*self),
+        }
+    }
+    fn release_state(&self, s: ReleasableState) -> Option<Self> {
+        match (*self, s) {
+            (NormalKey { keycode: k1, .. }, ReleasableState::KeyCode(k2)) => {
+                if k1 == k2 {
+                    None
+                } else {
+                    Some(*self)
+                }
+            }
+            (LayerModifier { value: l1, .. }, ReleasableState::Layer(l2)) => {
+                if l1 == l2 {
+                    None
+                } else {
+                    Some(*self)
+                }
             }
             _ => Some(*self),
         }
@@ -524,11 +543,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                     seq.delay = seq.delay.saturating_sub(1);
                 } else if let Some(keycode) = seq.tapped {
                     // Clear out the Press() matching this Tap()'s keycode
-                    self.states = self
-                        .states
-                        .iter()
-                        .filter_map(|s| s.seq_release(keycode))
-                        .collect();
+                    self.states.retain(|s| s.seq_release(keycode).is_some());
                     seq.tapped = None;
                 } else {
                     // Pull the next SequenceEvent
@@ -543,15 +558,8 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                     match seq.cur_event {
                         Some(SequenceEvent::Complete) => {
                             for fake_key in self.states.clone().iter() {
-                                match *fake_key {
-                                    FakeKey { keycode } => {
-                                        self.states = self
-                                            .states
-                                            .iter()
-                                            .filter_map(|s| s.seq_release(keycode))
-                                            .collect();
-                                    }
-                                    _ => {}
+                                if let FakeKey { keycode } = *fake_key {
+                                    self.states.retain(|s| s.seq_release(keycode).is_some());
                                 }
                             }
                             seq.remaining_events = &[];
@@ -567,11 +575,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                         }
                         Some(SequenceEvent::Release(keycode)) => {
                             // Clear out the Press() matching this Release's keycode
-                            self.states = self
-                                .states
-                                .iter()
-                                .filter_map(|s| s.seq_release(keycode))
-                                .collect()
+                            self.states.retain(|s| s.seq_release(keycode).is_some());
                         }
                         Some(SequenceEvent::Delay { duration }) => {
                             // Setup a delay that will be decremented once per tick until 0
@@ -583,7 +587,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                         _ => {} // We'll never get here
                     }
                 }
-                if seq.remaining_events.len() > 0 {
+                if !seq.remaining_events.is_empty() {
                     // Put it back
                     self.active_sequences.push_back(seq);
                 }
@@ -595,11 +599,8 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
         match stacked.event {
             Release(i, j) => {
                 let mut custom = CustomEvent::NoEvent;
-                self.states = self
-                    .states
-                    .iter()
-                    .filter_map(|s| s.release((i, j), &mut custom))
-                    .collect();
+                self.states
+                    .retain(|s| s.release((i, j), &mut custom).is_some());
                 custom
             }
             Press(i, j) => {
@@ -729,15 +730,8 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                 // Clear any and all running sequences then clean up any leftover FakeKey events
                 self.active_sequences.clear();
                 for fake_key in self.states.clone().iter() {
-                    match *fake_key {
-                        FakeKey { keycode } => {
-                            self.states = self
-                                .states
-                                .iter()
-                                .filter_map(|s| s.seq_release(keycode))
-                                .collect();
-                        }
-                        _ => {}
+                    if let FakeKey { keycode } = *fake_key {
+                        self.states.retain(|s| s.seq_release(keycode).is_some());
                     }
                 }
             }
@@ -754,6 +748,9 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                 if self.states.push(State::Custom { value, coord }).is_ok() {
                     return CustomEvent::Press(value);
                 }
+            }
+            ReleaseState(rs) => {
+                self.states.retain(|s| s.release_state(*rs).is_some());
             }
         }
         CustomEvent::NoEvent
@@ -1738,6 +1735,60 @@ mod test {
             assert_eq!(CustomEvent::NoEvent, layout.tick());
             assert_keys(&[LAlt], layout.keycodes());
         }
+        layout.event(Release(0, 0));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[], layout.keycodes());
+    }
+
+    #[test]
+    fn release_state() {
+        static LAYERS: Layers<2, 1, 2> = [
+            [[
+                MultipleActions(&[
+                    KeyCode(LCtrl),
+                    Layer(1),
+                ]),
+                MultipleActions(&[
+                    KeyCode(LAlt),
+                    Layer(1),
+                ]),
+            ]],
+            [[
+                MultipleActions(&[
+                    ReleaseState(ReleasableState::KeyCode(LAlt)),
+                    KeyCode(Space),
+                ]),
+                ReleaseState(ReleasableState::Layer(1)),
+            ]],
+        ];
+
+        let mut layout = Layout::new(&LAYERS);
+
+        layout.event(Press(0, 1));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[LAlt], layout.keycodes());
+        assert_eq!(1, layout.current_layer());
+        layout.event(Press(0, 0));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[Space], layout.keycodes());
+        layout.event(Release(0, 0));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[], layout.keycodes());
+        layout.event(Release(0, 1));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[], layout.keycodes());
+
+        layout.event(Press(0, 0));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[LCtrl], layout.keycodes());
+        assert_eq!(1, layout.current_layer());
+        layout.event(Press(0, 1));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_eq!(0, layout.current_layer());
+        assert_keys(&[LCtrl], layout.keycodes());
+        layout.event(Release(0, 1));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[LCtrl], layout.keycodes());
         layout.event(Release(0, 0));
         assert_eq!(CustomEvent::NoEvent, layout.tick());
         assert_keys(&[], layout.keycodes());

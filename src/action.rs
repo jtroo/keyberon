@@ -152,9 +152,18 @@ impl PartialEq for HoldTapConfig {
 
 impl Eq for HoldTapConfig {}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// A state that that can be released from the active states via the ReleaseState action.
+pub enum ReleasableState {
+    /// Release an active keycode
+    KeyCode(KeyCode),
+    /// Release an active layer
+    Layer(usize),
+}
+
 /// The different actions that can be done.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Action<T = core::convert::Infallible>
 where
     T: 'static,
@@ -262,7 +271,31 @@ where
     /// to drive any non keyboard related actions that you might
     /// manage with key events.
     Custom(T),
+    /// Action to release either a keycode state or a layer state.
+    ReleaseState(ReleasableState),
 }
+
+impl<T> Debug for Action<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoOp => write!(f, "NoOp"),
+            Self::Trans => write!(f, "Trans"),
+            Self::KeyCode(arg0) => f.debug_tuple("KeyCode").field(arg0).finish(),
+            Self::MultipleKeyCodes(arg0) => f.debug_tuple("MultipleKeyCodes").field(arg0).finish(),
+            Self::MultipleActions(arg0) => f.debug_tuple("MultipleActions").field(arg0).finish(),
+            Self::Layer(arg0) => f.debug_tuple("Layer").field(arg0).finish(),
+            Self::DefaultLayer(arg0) => f.debug_tuple("DefaultLayer").field(arg0).finish(),
+            Self::HoldTap { timeout, hold, tap, config, tap_hold_interval } => f.debug_struct("HoldTap").field("timeout", timeout).field("hold", hold).field("tap", tap).field("config", config).field("tap_hold_interval", tap_hold_interval).finish(),
+            Self::Sequence { events } => f.debug_struct("Sequence").field("events", events).finish(),
+            Self::CancelSequences => write!(f, "CancelSequences"),
+            Self::OneShot { action, timeout } => f.debug_struct("OneShot").field("action", action).field("timeout", timeout).finish(),
+            Self::TapDance { actions, timeout } => f.debug_struct("TapDance").field("actions", actions).field("timeout", timeout).finish(),
+            Self::Custom(_) => f.debug_tuple("Custom").finish(),
+            Self::ReleaseState(arg0) => f.debug_tuple("ReleaseState").field(arg0).finish(),
+        }
+    }
+}
+
 impl<T> Action<T> {
     /// Gets the layer number if the action is the `Layer` action.
     pub fn layer(self) -> Option<usize> {

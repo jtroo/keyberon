@@ -1,18 +1,6 @@
-//! Keyberon is a rust crate to create a pure rust keyboard firmware.
-//!
-//! It is exposed as a library giving you the different building
-//! blocks to create a featureful keyboard firmware. As the different
-//! functionality are interconected by the user of the crate, you can
-//! use only the parts you are interested in or easily insert your own
-//! code in between.
-//!
-//! This crate is a no_std crate, running on stable rust. To use it on
-//! a given MCU, you need GPIO throw the [embedded hal
-//! crate](https://crates.io/crates/embedded-hal) to read the key
-//! states, and the [usb-device
-//! crate](https://crates.io/crates/usb-device) for USB communication.
+//! This is a fork intended for use by the [kanata keyboard remapper software](https://github.com/jtroo/kanata).
+//! Please make contributions to the original project.
 
-#![no_std]
 #![deny(missing_docs)]
 
 use usb_device::bus::UsbBusAllocator;
