@@ -1,8 +1,6 @@
 //! This is a fork intended for use by the [kanata keyboard remapper software](https://github.com/jtroo/kanata).
 //! Please make contributions to the original project.
 
-#![deny(missing_docs)]
-
 use usb_device::bus::UsbBusAllocator;
 use usb_device::prelude::*;
 

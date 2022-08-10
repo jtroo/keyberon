@@ -55,7 +55,8 @@ where
 {
     layers: &'static [[[Action<T>; C]; R]; L],
     default_layer: usize,
-    states: Vec<State<T>, 64>,
+    /// Key states.
+    pub states: Vec<State<T>, 64>,
     waiting: Option<WaitingState<T>>,
     stacked: Stack,
     oneshot: OneShotState,
@@ -152,7 +153,7 @@ impl<T> Default for CustomEvent<T> {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum State<T: 'static> {
+pub enum State<T: 'static> {
     NormalKey { keycode: KeyCode, coord: (u8, u8) },
     LayerModifier { value: usize, coord: (u8, u8) },
     Custom { value: &'static T, coord: (u8, u8) },
@@ -175,7 +176,7 @@ impl<T: 'static> State<T> {
     fn tick(&self) -> Option<Self> {
         Some(*self)
     }
-    fn release(&self, c: (u8, u8), custom: &mut CustomEvent<T>) -> Option<Self> {
+    pub fn release(&self, c: (u8, u8), custom: &mut CustomEvent<T>) -> Option<Self> {
         match *self {
             NormalKey { coord, .. } | LayerModifier { coord, .. } if coord == c => None,
             Custom { value, coord } if coord == c => {
@@ -185,7 +186,7 @@ impl<T: 'static> State<T> {
             _ => Some(*self),
         }
     }
-    fn release_state(&self, s: ReleasableState) -> Option<Self> {
+    pub fn release_state(&self, s: ReleasableState) -> Option<Self> {
         match (*self, s) {
             (NormalKey { keycode: k1, .. }, ReleasableState::KeyCode(k2)) => {
                 if k1 == k2 {

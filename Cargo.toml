@@ -1,9 +1,9 @@
 [package]
 name = "kanata-keyberon"
-version = "0.2.5"
-authors = ["Guillaume Pinot <texitoi@texitoi.eu>", "Robin Krahl <robin.krahl@ireas.org>"]
+version = "0.2.6"
+authors = ["Guillaume Pinot <texitoi@texitoi.eu>", "Robin Krahl <robin.krahl@ireas.org>", "jtroo <j.andreitabs@gmail.com>"]
 edition = "2018"
-description = "Pure Rust keyboard firmware. Fork intended for use with kanata"
+description = "Pure Rust keyboard firmware. Fork intended for use with kanata."
 documentation = "https://docs.rs/keyberon"
 repository = "https://github.com/TeXitoi/keyberon"
 keywords = ["keyboard", "usb-device", "firmware", "kanata"]
