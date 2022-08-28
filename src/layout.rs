@@ -394,15 +394,15 @@ type ReleasedOneShotKeys = Vec<(u8, u8), ONE_SHOT_MAX_ACTIVE>;
 /// Contains the state of one shot keys that are currently active.
 pub struct OneShotState {
     /// Coordinates of one shot keys that are active
-    keys: ArrayDeque<OneShotKeys, arraydeque::behavior::Wrapping>,
+    pub keys: ArrayDeque<OneShotKeys, arraydeque::behavior::Wrapping>,
     /// Coordinates of one shot keys that have been released
-    released_keys: ArrayDeque<OneShotKeys, arraydeque::behavior::Wrapping>,
+    pub released_keys: ArrayDeque<OneShotKeys, arraydeque::behavior::Wrapping>,
     /// Timeout (ms) after which all one shot keys expire
-    timeout: u16,
+    pub timeout: u16,
     /// Contains the end config of the most recently pressed one shot key
-    end_config: OneShotEndConfig,
+    pub end_config: OneShotEndConfig,
     /// Marks if release of the one shot keys should be done on the next tick
-    release_on_next_tick: bool,
+    pub release_on_next_tick: bool,
 }
 
 impl OneShotState {
@@ -495,8 +495,8 @@ impl Stacked {
 
 #[derive(Default)]
 pub struct TapHoldTracker {
-    coord: (u8, u8),
-    timeout: u16,
+    pub coord: (u8, u8),
+    pub timeout: u16,
 }
 
 impl TapHoldTracker {
