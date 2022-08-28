@@ -53,15 +53,15 @@ pub struct Layout<const C: usize, const R: usize, const L: usize, T = core::conv
 where
     T: 'static,
 {
-    layers: &'static [[[Action<T>; C]; R]; L],
-    default_layer: usize,
+    pub layers: &'static [[[Action<T>; C]; R]; L],
+    pub default_layer: usize,
     /// Key states.
     pub states: Vec<State<T>, 64>,
-    waiting: Option<WaitingState<T>>,
-    stacked: Stack,
-    oneshot: OneShotState,
-    tap_hold_tracker: TapHoldTracker,
-    active_sequences: ArrayDeque<[SequenceState; 4], arraydeque::behavior::Wrapping>,
+    pub waiting: Option<WaitingState<T>>,
+    pub stacked: Stack,
+    pub oneshot: OneShotState,
+    pub tap_hold_tracker: TapHoldTracker,
+    pub active_sequences: ArrayDeque<[SequenceState; 4], arraydeque::behavior::Wrapping>,
 }
 
 /// An event on the key matrix.
@@ -233,7 +233,7 @@ enum WaitingConfig<T: 'static> {
 }
 
 #[derive(Debug)]
-struct WaitingState<T: 'static> {
+pub struct WaitingState<T: 'static> {
     coord: (u8, u8),
     timeout: u16,
     delay: u16,
@@ -381,7 +381,7 @@ impl<T> WaitingState<T> {
 }
 
 #[derive(Debug, Copy, Clone)]
-struct SequenceState {
+pub struct SequenceState {
     cur_event: Option<SequenceEvent>,
     delay: u32,              // Keeps track of SequenceEvent::Delay time remaining
     tapped: Option<KeyCode>, // Keycode of a key that should be released at the next tick
@@ -392,7 +392,7 @@ type OneShotKeys = [(u8, u8); ONE_SHOT_MAX_ACTIVE];
 type ReleasedOneShotKeys = Vec<(u8, u8), ONE_SHOT_MAX_ACTIVE>;
 
 /// Contains the state of one shot keys that are currently active.
-struct OneShotState {
+pub struct OneShotState {
     /// Coordinates of one shot keys that are active
     keys: ArrayDeque<OneShotKeys, arraydeque::behavior::Wrapping>,
     /// Coordinates of one shot keys that have been released
@@ -494,7 +494,7 @@ impl Stacked {
 }
 
 #[derive(Default)]
-struct TapHoldTracker {
+pub struct TapHoldTracker {
     coord: (u8, u8),
     timeout: u16,
 }
