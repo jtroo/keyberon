@@ -214,7 +214,16 @@ pub enum KeyCode {
     CrSel,
     ExSel,
 
-    // According to QMK, 0xA5-0xDF are not usable on modern keyboards
+    // According to QMK, 0xA5-0xDF are not usable on modern keyboards. The keys below are
+    // not real keys for USB codes; they are used only for kanata.
+
+    Wakeup, // 0xA5
+    BrightnessUp,
+    BrightnessDown,
+    KbdIllumUp,
+    KbdIllumDown,
+
+    UnmappedMax = 0xDF,
 
     // Modifiers
     /// Left Control.
