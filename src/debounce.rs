@@ -69,7 +69,7 @@ impl<T: PartialEq> Debouncer<T> {
     ///
     /// `T` must be some kind of array of array of bool.
     ///
-    /// Panics if the coordinates doesn't fit in a `(u8, u8)`.
+    /// Panics if the coordinates doesn't fit in a `(u8, u16)`.
     ///
     /// # Example
     ///
@@ -110,8 +110,8 @@ impl<T: PartialEq> Debouncer<T> {
                     .flat_map(move |(i, (o, n))| {
                         o.into_iter().zip(n.into_iter()).enumerate().filter_map(
                             move |(j, bools)| match bools {
-                                (false, true) => Some(Event::Press(i as u8, j as u8)),
-                                (true, false) => Some(Event::Release(i as u8, j as u8)),
+                                (false, true) => Some(Event::Press(i as u8, j as u16)),
+                                (true, false) => Some(Event::Release(i as u8, j as u16)),
                                 _ => None,
                             },
                         )

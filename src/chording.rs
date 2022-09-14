@@ -15,7 +15,7 @@
 use crate::layout::Event;
 use heapless::Vec;
 
-type KeyPosition = (u8, u8);
+type KeyPosition = (u8, u16);
 
 /// Description of the virtual key corresponding to a given chord.
 /// keys are the coordinates of the multiple keys that make up the chord

@@ -68,13 +68,13 @@ where
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Event {
     /// Press event with coordinates (i, j).
-    Press(u8, u8),
+    Press(u8, u16),
     /// Release event with coordinates (i, j).
-    Release(u8, u8),
+    Release(u8, u16),
 }
 impl Event {
     /// Returns the coordinates (i, j) of the event.
-    pub fn coord(self) -> (u8, u8) {
+    pub fn coord(self) -> (u8, u16) {
         match self {
             Event::Press(i, j) => (i, j),
             Event::Release(i, j) => (i, j),
@@ -92,7 +92,7 @@ impl Event {
     ///     Event::Press(3, 1).transform(|i, j| (i, 11 - j)),
     /// );
     /// ```
-    pub fn transform(self, f: impl FnOnce(u8, u8) -> (u8, u8)) -> Self {
+    pub fn transform(self, f: impl FnOnce(u8, u16) -> (u8, u16)) -> Self {
         match self {
             Event::Press(i, j) => {
                 let (i, j) = f(i, j);
@@ -154,9 +154,9 @@ impl<T> Default for CustomEvent<T> {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum State<T: 'static> {
-    NormalKey { keycode: KeyCode, coord: (u8, u8) },
-    LayerModifier { value: usize, coord: (u8, u8) },
-    Custom { value: &'static T, coord: (u8, u8) },
+    NormalKey { keycode: KeyCode, coord: (u8, u16) },
+    LayerModifier { value: usize, coord: (u8, u16) },
+    Custom { value: &'static T, coord: (u8, u16) },
     FakeKey { keycode: KeyCode }, // Fake key event for sequences
 }
 impl<T> Copy for State<T> {}
@@ -176,7 +176,7 @@ impl<T: 'static> State<T> {
     fn tick(&self) -> Option<Self> {
         Some(*self)
     }
-    pub fn release(&self, c: (u8, u8), custom: &mut CustomEvent<T>) -> Option<Self> {
+    pub fn release(&self, c: (u8, u16), custom: &mut CustomEvent<T>) -> Option<Self> {
         match *self {
             NormalKey { coord, .. } | LayerModifier { coord, .. } if coord == c => None,
             Custom { value, coord } if coord == c => {
@@ -234,7 +234,7 @@ enum WaitingConfig<T: 'static> {
 
 #[derive(Debug)]
 pub struct WaitingState<T: 'static> {
-    coord: (u8, u8),
+    coord: (u8, u16),
     timeout: u16,
     delay: u16,
     hold: &'static Action<T>,
@@ -388,8 +388,8 @@ pub struct SequenceState {
     remaining_events: &'static [SequenceEvent],
 }
 
-type OneShotKeys = [(u8, u8); ONE_SHOT_MAX_ACTIVE];
-type ReleasedOneShotKeys = Vec<(u8, u8), ONE_SHOT_MAX_ACTIVE>;
+type OneShotKeys = [(u8, u16); ONE_SHOT_MAX_ACTIVE];
+type ReleasedOneShotKeys = Vec<(u8, u16), ONE_SHOT_MAX_ACTIVE>;
 
 /// Contains the state of one shot keys that are currently active.
 pub struct OneShotState {
@@ -421,7 +421,7 @@ impl OneShotState {
         }
     }
 
-    fn handle_press(&mut self, (i, j): (u8, u8), is_oneshot_key: bool) {
+    fn handle_press(&mut self, (i, j): (u8, u16), is_oneshot_key: bool) {
         if self.keys.is_empty() {
             return;
         }
@@ -440,7 +440,7 @@ impl OneShotState {
     /// Returns true if the caller should handle the release normally and false otherwise.
     /// The second value in the tuple represents an overflow of released one shot keys and should
     /// be released is it is `Some`.
-    fn handle_release(&mut self, (i, j): (u8, u8)) -> (bool, Option<(u8, u8)>) {
+    fn handle_release(&mut self, (i, j): (u8, u16)) -> (bool, Option<(u8, u16)>) {
         if self.keys.is_empty() {
             return (true, None);
         }
@@ -495,7 +495,7 @@ impl Stacked {
 
 #[derive(Default)]
 pub struct TapHoldTracker {
-    pub coord: (u8, u8),
+    pub coord: (u8, u16),
     pub timeout: u16,
 }
 
@@ -695,7 +695,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
             self.unstack(stacked);
         }
     }
-    fn press_as_action(&self, coord: (u8, u8), layer: usize) -> &'static Action<T> {
+    fn press_as_action(&self, coord: (u8, u16), layer: usize) -> &'static Action<T> {
         use crate::action::Action::*;
         let action = self
             .layers
@@ -717,7 +717,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
     fn do_action(
         &mut self,
         action: &'static Action<T>,
-        coord: (u8, u8),
+        coord: (u8, u16),
         delay: u16,
     ) -> CustomEvent<T> {
         assert!(self.waiting.is_none());

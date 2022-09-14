@@ -59,9 +59,9 @@ where
     {
         let mut keys = [[false; CS]; RS];
 
-        for (ri, row) in (&mut self.rows).iter_mut().enumerate() {
+        for (ri, row) in self.rows.iter_mut().enumerate() {
             row.set_low()?;
-            for (ci, col) in (&self.cols).iter().enumerate() {
+            for (ci, col) in self.cols.iter().enumerate() {
                 if col.is_low()? {
                     keys[ri][ci] = true;
                 }
@@ -106,7 +106,7 @@ where
     {
         let mut keys = [[false; CS]; RS];
 
-        for (ri, row) in (&mut self.pins).iter_mut().enumerate() {
+        for (ri, row) in self.pins.iter_mut().enumerate() {
             for (ci, col_option) in row.iter().enumerate() {
                 if let Some(col) = col_option {
                     if col.is_low()? {
