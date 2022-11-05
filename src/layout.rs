@@ -405,6 +405,12 @@ pub struct OneShotState {
     pub release_on_next_tick: bool,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum OneShotHandlePressKey {
+    OneShotKey((u8, u16)),
+    Other,
+}
+
 impl OneShotState {
     fn tick(&mut self) -> Option<ReleasedOneShotKeys> {
         if self.keys.is_empty() {
@@ -421,19 +427,20 @@ impl OneShotState {
         }
     }
 
-    fn handle_press(&mut self, (i, j): (u8, u16), is_oneshot_key: bool) {
+    fn handle_press(&mut self, key: OneShotHandlePressKey) {
         if self.keys.is_empty() {
             return;
         }
-        match (is_oneshot_key, self.end_config) {
-            (true, _) => {
-                // a one shot key release if it's re-pressed
-                self.released_keys.retain(|coord| *coord != (i, j));
+        match key {
+            OneShotHandlePressKey::OneShotKey(pressed_coord) => {
+                // Release the one-shot key if it's re-pressed
+                self.released_keys.retain(|coord| *coord != pressed_coord);
             }
-            (_, OneShotEndConfig::EndOnFirstPress) => {
-                self.release_on_next_tick = true;
+            OneShotHandlePressKey::Other => {
+                if self.end_config == OneShotEndConfig::EndOnFirstPress {
+                    self.release_on_next_tick = true;
+                }
             }
-            _ => {}
         }
     }
 
@@ -537,7 +544,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
             if coord == self.tap_hold_tracker.coord {
                 self.tap_hold_tracker.timeout = 0;
             }
-            self.do_action(hold, coord, 0)
+            self.do_action(hold, coord, 0, false)
         } else {
             CustomEvent::NoEvent
         }
@@ -547,7 +554,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
             let tap = w.tap;
             let coord = w.coord;
             self.waiting = None;
-            self.do_action(tap, coord, 0)
+            self.do_action(tap, coord, 0, false)
         } else {
             CustomEvent::NoEvent
         }
@@ -629,10 +636,21 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                         Some(SequenceEvent::Press(keycode)) => {
                             // Start tracking this fake key Press() event
                             let _ = self.states.push(FakeKey { keycode });
+
+                            // Coord here doesn't matter; only matters if 2nd param is true. Need
+                            // to fake the coord anyway; sequence events don't have associated
+                            // coordinates.
+                            self.oneshot.handle_press(OneShotHandlePressKey::Other);
                         }
                         Some(SequenceEvent::Tap(keycode)) => {
                             // Same as Press() except we track it for one tick via seq.tapped:
                             let _ = self.states.push(FakeKey { keycode });
+
+                            // Coord here doesn't matter; only matters if 2nd param is true. Need
+                            // to fake the coord anyway; sequence events don't have associated
+                            // coordinates.
+                            self.oneshot.handle_press(OneShotHandlePressKey::Other);
+
                             seq.tapped = Some(keycode);
                         }
                         Some(SequenceEvent::Release(keycode)) => {
@@ -682,9 +700,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
             }
             Press(i, j) => {
                 let action = self.press_as_action((i, j), self.current_layer());
-                self.oneshot
-                    .handle_press((i, j), matches!(action, Action::OneShot(..)));
-                self.do_action(action, (i, j), stacked.since)
+                self.do_action(action, (i, j), stacked.since, false)
             }
         }
     }
@@ -719,6 +735,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
         action: &'static Action<T>,
         coord: (u8, u16),
         delay: u16,
+        is_oneshot: bool,
     ) -> CustomEvent<T> {
         assert!(self.waiting.is_none());
         use Action::*;
@@ -731,6 +748,7 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                 config,
                 tap_hold_interval,
             }) => {
+                let mut custom = CustomEvent::NoEvent;
                 if *tap_hold_interval == 0
                     || coord != self.tap_hold_tracker.coord
                     || self.tap_hold_tracker.timeout == 0
@@ -747,19 +765,23 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
                     self.tap_hold_tracker.timeout = *tap_hold_interval;
                 } else {
                     self.tap_hold_tracker.timeout = 0;
-                    self.do_action(tap, coord, delay);
+                    custom.update(self.do_action(tap, coord, delay, is_oneshot));
                 }
                 // Need to set tap_hold_tracker coord AFTER the checks.
                 self.tap_hold_tracker.coord = coord;
+                return custom;
             }
             &OneShot(oneshot) => {
                 self.tap_hold_tracker.coord = coord;
-                self.do_action(oneshot.action, coord, delay);
+                let custom = self.do_action(oneshot.action, coord, delay, true);
+                self.oneshot
+                    .handle_press(OneShotHandlePressKey::OneShotKey(coord));
                 self.oneshot.timeout = oneshot.timeout;
                 self.oneshot.end_config = oneshot.end_config;
                 if let Some(overflow) = self.oneshot.keys.push_back((coord.0, coord.1)) {
                     self.event(Event::Release(overflow.0, overflow.1));
                 }
+                return custom;
             }
             &TapDance(tapdance) => {
                 self.tap_hold_tracker.coord = coord;
@@ -779,18 +801,24 @@ impl<const C: usize, const R: usize, const L: usize, T: 'static> Layout<C, R, L,
             &KeyCode(keycode) => {
                 self.tap_hold_tracker.coord = coord;
                 let _ = self.states.push(NormalKey { coord, keycode });
+                if !is_oneshot {
+                    self.oneshot.handle_press(OneShotHandlePressKey::Other);
+                }
             }
             &MultipleKeyCodes(v) => {
                 self.tap_hold_tracker.coord = coord;
                 for &keycode in v {
                     let _ = self.states.push(NormalKey { coord, keycode });
                 }
+                if !is_oneshot {
+                    self.oneshot.handle_press(OneShotHandlePressKey::Other);
+                }
             }
             &MultipleActions(v) => {
                 self.tap_hold_tracker.coord = coord;
                 let mut custom = CustomEvent::NoEvent;
                 for action in v {
-                    custom.update(self.do_action(action, coord, delay));
+                    custom.update(self.do_action(action, coord, delay, is_oneshot));
                 }
                 return custom;
             }
@@ -1859,6 +1887,65 @@ mod test {
         assert_eq!(CustomEvent::NoEvent, layout.tick());
         assert_keys(&[LCtrl], layout.keycodes());
         assert_eq!(layout.current_layer(), 0);
+        layout.event(Release(0, 1));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[], layout.keycodes());
+    }
+
+    #[test]
+    fn one_shot_tap_hold() {
+        static LAYERS: Layers<3, 1, 2> = [
+            [[
+                OneShot(&crate::action::OneShot {
+                    timeout: 200,
+                    action: &k(LShift),
+                    end_config: OneShotEndConfig::EndOnFirstPress,
+                }),
+                HoldTap(&HoldTapAction {
+                    timeout: 100,
+                    hold: k(LAlt),
+                    tap: k(Space),
+                    config: HoldTapConfig::Default,
+                    tap_hold_interval: 0,
+                }),
+                NoOp,
+            ]],
+            [[k(A), k(B), k(C)]],
+        ];
+        let mut layout = Layout::new(&LAYERS);
+
+        layout.event(Press(0, 0));
+        layout.event(Release(0, 0));
+        for _ in 0..90 {
+            assert_eq!(CustomEvent::NoEvent, layout.tick());
+            assert_keys(&[LShift], layout.keycodes());
+        }
+        layout.event(Press(0, 1));
+        for _ in 0..90 {
+            assert_eq!(CustomEvent::NoEvent, layout.tick());
+            assert_keys(&[LShift], layout.keycodes());
+        }
+        layout.event(Release(0, 1));
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[LShift, Space], layout.keycodes());
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[], layout.keycodes());
+
+        layout.event(Press(0, 0));
+        layout.event(Release(0, 0));
+        for _ in 0..90 {
+            assert_eq!(CustomEvent::NoEvent, layout.tick());
+            assert_keys(&[LShift], layout.keycodes());
+        }
+        layout.event(Press(0, 1));
+        for _ in 0..100 {
+            assert_eq!(CustomEvent::NoEvent, layout.tick());
+            assert_keys(&[LShift], layout.keycodes());
+        }
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[LShift, LAlt], layout.keycodes());
+        assert_eq!(CustomEvent::NoEvent, layout.tick());
+        assert_keys(&[LAlt], layout.keycodes());
         layout.event(Release(0, 1));
         assert_eq!(CustomEvent::NoEvent, layout.tick());
         assert_keys(&[], layout.keycodes());
