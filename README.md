@@ -1,4 +1,10 @@
-# Note
+# kanata-keyberon-deprecated
 
-This is a fork intended for use by the [kanata keyboard remapper software](https://github.com/jtroo/kanata).
-Please make contributions to the original project.
+## Deprecation notice
+
+This repository is deprecated. It has been moved into the [kanata repository](https://github.com/jtroo/keyberon).
+
+## Note
+
+This is a fork intended for use by the [kanata keyboard remapper software](https://github.com/jtroo/keyberon).
+Please make contributions to the [original project](https://github.com/TeXitoi/keyberon) where applicable.
