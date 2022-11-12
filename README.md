@@ -2,7 +2,7 @@
 
 ## Deprecation notice
 
-This repository is deprecated. It has been moved into the [kanata repository](https://github.com/jtroo/keyberon).
+This repository is deprecated. It has been moved into the [kanata repository](https://github.com/jtroo/kanata/tree/main/keyberon).
 
 ## Note
 
